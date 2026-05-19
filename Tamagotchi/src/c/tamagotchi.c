@@ -42,6 +42,7 @@ static int8_t s_selectedIcon = -1; // -1 is none, 0-6 says what icon
 static bool s_showingAttentionIcon = false;
 static bool s_js_ready;
 static bool s_pixelsChanged = false;
+static uint16_t s_speakerFreq = 0;
 
 static bool_t s_screen_buffer[LCD_HEIGHT][LCD_WIDTH] = {{0}};
 static u12_t g_program[6144] = {0};
@@ -125,8 +126,19 @@ static void hal_set_lcd_icon(u8_t icon, bool_t val)
   layer_mark_dirty(s_icons_layer);
 }
 
-static void hal_set_frequency(u32_t freq) { } //TODO later for pebbles with speaker?
-static void hal_play_frequency(bool_t en) { } //TODO later for pebbles with speaker?
+static void hal_set_frequency(u32_t freq) {
+  s_speakerFreq = freq;
+}
+static void hal_play_frequency(bool_t en) {
+  if (en)
+  {
+    speaker_play_tone(s_speakerFreq, 3000, 5, SpeakerWaveformSine);
+  }
+  else
+  {
+    speaker_stop();
+  }
+}
 
 static int hal_handler(void)
 {
