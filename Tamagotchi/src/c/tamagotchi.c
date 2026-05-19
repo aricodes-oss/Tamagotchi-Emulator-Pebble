@@ -129,10 +129,12 @@ static void hal_set_lcd_icon(u8_t icon, bool_t val)
 static void hal_set_frequency(u32_t freq) {
   s_speakerFreq = freq;
 }
+
 static void hal_play_frequency(bool_t en) {
   if (en)
   {
-    speaker_play_tone(s_speakerFreq, 3000, 5, SpeakerWaveformSine);
+    speaker_stop(); //TODO test with playing tone with specific time when we disable it to get exact timings?
+    speaker_play_tone(s_speakerFreq / 10, 10000, 100, SpeakerWaveformSine);
   }
   else
   {
