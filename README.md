@@ -16,8 +16,8 @@ Powered by [TamaLib](https://github.com/jcrona/tamalib/).
 
 ## Features & Updates:
 v1.2.:
-- Add audio for Pebble's with speaker
-- Add vibrations for Pebble's without speaker
+- Add audio for Pebble watches with speaker
+- Add vibrations for Pebble watches without speaker
 
 v1.1.:
 - Fix bug where loading state from the server would continually fail in some cases
