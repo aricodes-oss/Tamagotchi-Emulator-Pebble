@@ -43,6 +43,12 @@ static bool s_showingAttentionIcon = false;
 static bool s_js_ready;
 static bool s_pixelsChanged = false;
 static uint16_t s_speakerFreq = 0;
+static uint32_t s_timeSincePlayFreq = 0;
+static const uint32_t s_vibesSegments[] = { 10000 };
+static VibePattern s_vibesPattern = {
+  .durations = s_vibesSegments,
+  .num_segments = 1,
+};
 
 static bool_t s_screen_buffer[LCD_HEIGHT][LCD_WIDTH] = {{0}};
 static u12_t g_program[6144] = {0};
@@ -64,6 +70,12 @@ static void Message(const char * text) // Write message to screen
 {
     layer_set_hidden((Layer *)s_screen_layer, true); // hide screen layer so we can read text
     text_layer_set_text(s_text_layer, text);
+}
+
+uint32_t millis() {
+  time_t tt = time(NULL);
+  uint16_t milliseconds = time_ms(&tt, NULL);
+  return tt * 1000 + milliseconds;
 }
 
 /*****************************/
@@ -133,12 +145,24 @@ static void hal_set_frequency(u32_t freq) {
 static void hal_play_frequency(bool_t en) {
   if (en)
   {
-    speaker_stop(); //TODO test with playing tone with specific time when we disable it to get exact timings?
-    speaker_play_tone(s_speakerFreq / 10, 10000, 100, SpeakerWaveformSine);
+    #if defined(PBL_SPEAKER)
+    speaker_stop(); 
+    speaker_play_tone(s_speakerFreq / 10, 5000, 100, SpeakerWaveformSquare);
+    #else
+    /*VibePattern pat = {
+      .durations = {10000},
+      .num_segments = 1,
+    };*/
+    vibes_enqueue_custom_pattern(s_vibesPattern);
+    #endif
   }
   else
   {
+    #if defined(PBL_SPEAKER)
     speaker_stop();
+    #else
+    vibes_cancel();
+    #endif
   }
 }
 
