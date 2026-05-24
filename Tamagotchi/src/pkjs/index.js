@@ -89,12 +89,12 @@ function FetchROM()
 
         let stringArray = ROMText.split(", ");
         let values = stringArray.map(s => parseInt(s, 16)); // convert to integers
-        if (values.length !== 6144) // exact length of P1 rom
+        /*if (values.length !== 6144) // exact length of P1 rom
         {
             console.log("Incorrect ROM!");
             Pebble.sendAppMessage({'JSMessage': "Incorrect ROM!"});
             return;
-        }
+        }*/ //TODO temp
 
         let buffer = new Uint8Array(values.length * 2); // use 2 bytes for each value
         for (let i = 0; i < values.length; i++) {
@@ -188,7 +188,7 @@ function SendSaveStateToWatch() // Send last save state back to watch
                 'STATEsp': serverState.sp,
                 'STATEflags': serverState.flags,
                 'STATEtick_counter': serverState.tick_counter,
-                'STATEclk_timer_timestamp': serverState.clk_timer_timestamp,
+                //TODO'STATEclk_timer_timestamp': serverState.clk_timer_timestamp,
                 'STATEprog_timer_timestamp': serverState.prog_timer_timestamp,
                 'STATEprog_timer_enabled': serverState.prog_timer_enabled,
                 'STATEprog_timer_data': serverState.prog_timer_data,

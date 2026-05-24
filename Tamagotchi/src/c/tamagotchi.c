@@ -51,7 +51,7 @@ static VibePattern s_vibesPattern = {
 };
 
 static bool_t s_screen_buffer[LCD_HEIGHT][LCD_WIDTH] = {{0}};
-static u12_t g_program[6144] = {0};
+static u12_t g_program[8192] = {0};
 static bool s_hasReceivedRom = false;
 static bool s_hasReceivedSaveFile = false;
 static bool s_clearTextLayerOnScreenRefresh = false;
@@ -447,7 +447,7 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
     for (int i = 0; i < chunk_t->length; i += 2) {
         index = (offset + i) / 2;
 
-        if (index >= 6144) break; // safety
+        if (index >= 8192) break; // safety //TODO test
 
         u12_t value = chunk[i] | (chunk[i + 1] << 8);
 
@@ -495,7 +495,14 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
   Tuple *STATEflags_t = dict_find(iter, MESSAGE_KEY_STATEflags);
 
   Tuple *STATEtick_counter_t = dict_find(iter, MESSAGE_KEY_STATEtick_counter);
-  Tuple *STATEclk_timer_timestamp_t = dict_find(iter, MESSAGE_KEY_STATEclk_timer_timestamp);
+  Tuple *STATEclk_timer_2hz_timestamp_t = dict_find(iter, MESSAGE_KEY_STATEclk_timer_2hz_timestamp);
+  Tuple *STATEclk_timer_4hz_timestamp_t = dict_find(iter, MESSAGE_KEY_STATEclk_timer_4hz_timestamp);
+  Tuple *STATEclk_timer_8hz_timestamp_t = dict_find(iter, MESSAGE_KEY_STATEclk_timer_8hz_timestamp);
+  Tuple *STATEclk_timer_16hz_timestamp_t = dict_find(iter, MESSAGE_KEY_STATEclk_timer_16hz_timestamp);
+  Tuple *STATEclk_timer_32hz_timestamp_t = dict_find(iter, MESSAGE_KEY_STATEclk_timer_32hz_timestamp);
+  Tuple *STATEclk_timer_64hz_timestamp_t = dict_find(iter, MESSAGE_KEY_STATEclk_timer_64hz_timestamp);
+  Tuple *STATEclk_timer_128hz_timestamp_t = dict_find(iter, MESSAGE_KEY_STATEclk_timer_128hz_timestamp);
+  Tuple *STATEclk_timer_256hz_timestamp_t = dict_find(iter, MESSAGE_KEY_STATEclk_timer_256hz_timestamp);
   Tuple *STATEprog_timer_timestamp_t = dict_find(iter, MESSAGE_KEY_STATEprog_timer_timestamp);
   Tuple *STATEprog_timer_enabled_t = dict_find(iter, MESSAGE_KEY_STATEprog_timer_enabled);
   Tuple *STATEprog_timer_data_t = dict_find(iter, MESSAGE_KEY_STATEprog_timer_data);
@@ -528,7 +535,16 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
     uint8_t state_flags = STATEflags_t->value->uint8;
 
     uint32_t state_tick_counter = STATEtick_counter_t->value->uint32;
-    uint32_t state_clk_timer_timestamp = STATEclk_timer_timestamp_t->value->uint32;
+
+    uint32_t state_clk_timer_2hz_timestamp = STATEclk_timer_2hz_timestamp_t->value->uint32;;
+    uint32_t state_clk_timer_4hz_timestamp = STATEclk_timer_4hz_timestamp_t->value->uint32;;
+    uint32_t state_clk_timer_8hz_timestamp = STATEclk_timer_8hz_timestamp_t->value->uint32;;
+    uint32_t state_clk_timer_16hz_timestamp = STATEclk_timer_16hz_timestamp_t->value->uint32;;
+    uint32_t state_clk_timer_32hz_timestamp = STATEclk_timer_32hz_timestamp_t->value->uint32;;
+    uint32_t state_clk_timer_64hz_timestamp = STATEclk_timer_64hz_timestamp_t->value->uint32;;
+    uint32_t state_clk_timer_128hz_timestamp = STATEclk_timer_128hz_timestamp_t->value->uint32;;
+    uint32_t state_clk_timer_256hz_timestamp = STATEclk_timer_256hz_timestamp_t->value->uint32;;
+    
     uint32_t state_prog_timer_timestamp = STATEprog_timer_timestamp_t->value->uint32;
     uint8_t state_prog_timer_enabled = STATEprog_timer_enabled_t->value->uint8;
     uint8_t state_prog_timer_data = STATEprog_timer_data_t->value->uint8;
@@ -548,7 +564,8 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
     stateToLoad.flags = state_flags;
 
     stateToLoad.tick_counter = state_tick_counter;
-    stateToLoad.clk_timer_timestamp = state_clk_timer_timestamp;
+    
+    //stateToLoad.clk_timer_timestamp = state_clk_timer_timestamp;
     stateToLoad.prog_timer_timestamp = state_prog_timer_timestamp;
     stateToLoad.prog_timer_enabled = state_prog_timer_enabled;
     stateToLoad.prog_timer_data = state_prog_timer_data;
@@ -797,7 +814,15 @@ static void saveCurrentStateAndQuit()
     dict_write_int(out_iter, MESSAGE_KEY_STATEflags, &saveState.flags, sizeof(uint8_t), false);
     
     dict_write_int(out_iter, MESSAGE_KEY_STATEtick_counter, &saveState.tick_counter, sizeof(uint32_t), false);
-    dict_write_int(out_iter, MESSAGE_KEY_STATEclk_timer_timestamp, &saveState.clk_timer_timestamp, sizeof(uint32_t), false);
+    dict_write_int(out_iter, MESSAGE_KEY_STATEclk_timer_2hz_timestamp, &saveState.clk_timer_2hz_timestamp, sizeof(uint32_t), false);
+    dict_write_int(out_iter, MESSAGE_KEY_STATEclk_timer_4hz_timestamp, &saveState.clk_timer_4hz_timestamp, sizeof(uint32_t), false);
+    dict_write_int(out_iter, MESSAGE_KEY_STATEclk_timer_8hz_timestamp, &saveState.clk_timer_8hz_timestamp, sizeof(uint32_t), false);
+    dict_write_int(out_iter, MESSAGE_KEY_STATEclk_timer_16hz_timestamp, &saveState.clk_timer_16hz_timestamp, sizeof(uint32_t), false);
+    dict_write_int(out_iter, MESSAGE_KEY_STATEclk_timer_32hz_timestamp, &saveState.clk_timer_32hz_timestamp, sizeof(uint32_t), false);
+    dict_write_int(out_iter, MESSAGE_KEY_STATEclk_timer_64hz_timestamp, &saveState.clk_timer_64hz_timestamp, sizeof(uint32_t), false);
+    dict_write_int(out_iter, MESSAGE_KEY_STATEclk_timer_128hz_timestamp, &saveState.clk_timer_128hz_timestamp, sizeof(uint32_t), false);
+    dict_write_int(out_iter, MESSAGE_KEY_STATEclk_timer_256hz_timestamp, &saveState.clk_timer_256hz_timestamp, sizeof(uint32_t), false);
+
     dict_write_int(out_iter, MESSAGE_KEY_STATEprog_timer_timestamp, &saveState.prog_timer_timestamp, sizeof(uint32_t), false);
     dict_write_int(out_iter, MESSAGE_KEY_STATEprog_timer_enabled, &saveState.prog_timer_enabled, sizeof(uint8_t), false);
     dict_write_int(out_iter, MESSAGE_KEY_STATEprog_timer_data, &saveState.prog_timer_data, sizeof(uint8_t), false);
