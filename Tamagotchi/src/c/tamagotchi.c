@@ -7,6 +7,7 @@
 #define VRAM_SIZE (64 + 13)
 #define BYTES_PER_LINE 32
 #define BITS_PER_BYTE 8
+#define P1P2_ID 0xFA2
 
 //#undef PBL_COLOR // only used for testing B&W
 
@@ -114,7 +115,7 @@ static void hal_update_screen(void) //since we're not using tamalib_mainloop we 
 
 static void hal_set_lcd_matrix(u8_t x, u8_t y, bool_t val)
 {
-  APP_LOG(APP_LOG_LEVEL_DEBUG, "setting lcd screen"); //TODO  
+  //APP_LOG(APP_LOG_LEVEL_DEBUG, "setting lcd screen"); 
   s_screen_buffer[y][x] = val;
   s_pixelsChanged = true;
 }
@@ -193,7 +194,7 @@ static hal_t hal = {
 /*   END HAL T FUNCTIONS   */
 /***************************/
 
-void set_screen_to_last_state(uint8_t *fullRam) { // gets screen data from memory and sets it to the screen
+void set_screen_to_last_state(uint8_t *fullRam) { // gets screen data from memory and sets it to the screen //TODO will likely not work for digimon
     uint8_t vram[VRAM_SIZE];
 
     memcpy(vram, fullRam + 320, VRAM_SIZE);
@@ -422,18 +423,6 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
     Message("Loading ROM 0%");
   }
 
-  Tuple *reset_tamagotchi_t = dict_find(iter, MESSAGE_KEY_reset_tamagotchi);
-  if (reset_tamagotchi_t)
-  {
-    if (s_hasReceivedRom)
-    {
-      s_clearTextLayerOnScreenRefresh = true;
-      s_hasReceivedSaveFile = false;
-      initTamalib();
-    }
-  }
-  
-
   // handle incoming rom
   Tuple *offset_t = dict_find(iter, MESSAGE_KEY_ROMOffset);
   Tuple *chunk_t = dict_find(iter, MESSAGE_KEY_ROMChunk);
@@ -443,29 +432,43 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
     int offset = offset_t->value->int16;
     uint8_t *chunk = chunk_t->value->data;
     int index = 0;
+    bool_t isP1P2 = false;
 
     // Convert bytes → u12_t values
     for (int i = 0; i < chunk_t->length; i += 2) {
         index = (offset + i) / 2;
 
-        if (index >= 8192) break; // safety //TODO test
+        if (index >= 8192) break; // safety
 
         u12_t value = chunk[i] | (chunk[i + 1] << 8);
 
         g_program[index] = value & 0x0FFF; // ensure 12-bit
+        isP1P2 = g_program[0] == P1P2_ID;
 
         static char progress_text[25];
-        int percentage = (offset * 100)/12288;
+        
+        int percentage = (offset * 100)/(isP1P2?12288:16384);
         snprintf(progress_text, sizeof(progress_text), "Loading ROM %d%%", percentage);
         Message(progress_text);
     }
-    if (index == 6143)
+    if ((isP1P2 && index == 6143) || index == 8191) // if detects P1/P2 stop at 6143, else stop at 8191)
     {
       // we reached the end and can safely start now
       Message("Loading ROM 100%");
-      APP_LOG(APP_LOG_LEVEL_DEBUG, "Reached end of ROM!");
+      APP_LOG(APP_LOG_LEVEL_DEBUG, "Reached end of ROM! %d", index);
       s_hasReceivedRom = true;
       // wait for save file from js
+    }
+  }
+
+  Tuple *reset_tamagotchi_t = dict_find(iter, MESSAGE_KEY_reset_tamagotchi);
+  if (reset_tamagotchi_t)
+  {
+    if (s_hasReceivedRom)
+    {
+      s_clearTextLayerOnScreenRefresh = true;
+      s_hasReceivedSaveFile = false;
+      initTamalib();
     }
   }
 
