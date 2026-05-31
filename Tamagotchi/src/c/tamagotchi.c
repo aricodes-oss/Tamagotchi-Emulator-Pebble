@@ -2,7 +2,6 @@
 #define FPS 30
 #define FPS_DELAY 1000/FPS //ms
 #define STEP_DELAY 1 //ms
-#define STEPS_PER_DELAY 600//55  
 
 #define VRAM_SIZE (64 + 13)
 #define BYTES_PER_LINE 32
@@ -56,6 +55,7 @@ static u12_t g_program[8192] = {0};
 static bool s_hasReceivedRom = false;
 static bool s_hasReceivedSaveFile = false;
 static bool s_clearTextLayerOnScreenRefresh = false;
+static bool s_tamalib_is_late = false;
 static flat_state_t stateToLoad = {0};
 
 //ticks
@@ -105,7 +105,9 @@ static timestamp_t hal_get_timestamp(void)
 
 static void hal_sleep_until(timestamp_t ts) //this makes the time be accurate
 {
-  while((int) (ts - hal_get_timestamp()) > 0);
+  if ((int) (ts - hal_get_timestamp()) > 0) {
+    s_tamalib_is_late = false;
+  }
 }
 
 static void hal_update_screen(void) //since we're not using tamalib_mainloop we must call this ourselves
@@ -250,10 +252,10 @@ static void milli_tick() //runs once every ms.
 {
   if (s_hasReceivedRom && s_hasReceivedSaveFile)
   {
-    for (size_t i = 0; i < STEPS_PER_DELAY; i++)
-    {
-        tamalib_step();
-    } 
+    s_tamalib_is_late = true;
+    while (s_tamalib_is_late) {
+      tamalib_step();
+    }
   } 
   milli_tick_handler = app_timer_register(STEP_DELAY, milli_tick, NULL); // calls itself in 1ms
 }
