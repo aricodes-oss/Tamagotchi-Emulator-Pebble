@@ -7,6 +7,10 @@ const APIKEY_KEY = "APIKEY";
 const ROMURL_KEY = "ROMURL";
 const SERVER_SAVE_FAILED_KEY = "SERVER_SAVE_FAILED";
 
+const CURRENT_VERSION = "1.3";
+const LAST_VERSION_NOTIFIED_KEY = "LAST_VERSION_NOTIFIED";
+const RELEASE_NOTE_TITLE = "Tamagotchi V1.3.0 Release Notes";
+const RELEASE_NOTE_BODY = "ATTENTION: Bug fixes + TamaLIB update. Old save states may no longer work and a reset is likely needed :( Update your Tamagotchi API Server manually if used."
 
 // Import the Clay package
 var Clay = require('@rebble/clay');
@@ -263,6 +267,16 @@ Pebble.addEventListener('ready',
 
         // Update s_js_ready on watch
         Pebble.sendAppMessage({'JSReady': 1});
+
+        let lastVersionNotified = localStorage.getItem(LAST_VERSION_NOTIFIED_KEY);
+        if (lastVersionNotified === null || lastVersionNotified !== CURRENT_VERSION)
+        {
+            Pebble.showSimpleNotificationOnPebble(
+                RELEASE_NOTE_TITLE,
+                RELEASE_NOTE_BODY
+            );
+            localStorage.setItem(LAST_VERSION_NOTIFIED_KEY, CURRENT_VERSION);
+        }
 
         FetchROM();
     }   

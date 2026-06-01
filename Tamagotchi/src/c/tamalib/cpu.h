@@ -25,7 +25,7 @@
 #define MEMORY_SIZE				4096 // 4096 x 4 bits
 
 #define E0C6S46_SUPPORT
-#define E0C6S48_SUPPORT
+//#define E0C6S48_SUPPORT
 
 #if defined(E0C6S48_SUPPORT)
 /* E0C6S48 (compatible with E0C6S46) */

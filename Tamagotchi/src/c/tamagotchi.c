@@ -196,7 +196,9 @@ static hal_t hal = {
 /*   END HAL T FUNCTIONS   */
 /***************************/
 
-void set_screen_to_last_state(uint8_t *fullRam) { // gets screen data from memory and sets it to the screen //TODO will likely not work for digimon
+// TODO: Seems to only work when E0C6S48_SUPPORT is not defined. Use segment information to restore properly?
+// Will likely not work with digimon as well
+void set_screen_to_last_state(uint8_t *fullRam) { // gets screen data from memory and sets it to the screen 
     uint8_t vram[VRAM_SIZE];
 
     memcpy(vram, fullRam + 320, VRAM_SIZE);
@@ -542,14 +544,14 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
 
     uint32_t state_tick_counter = STATEtick_counter_t->value->uint32;
 
-    uint32_t state_clk_timer_2hz_timestamp = STATEclk_timer_2hz_timestamp_t->value->uint32;;
-    uint32_t state_clk_timer_4hz_timestamp = STATEclk_timer_4hz_timestamp_t->value->uint32;;
-    uint32_t state_clk_timer_8hz_timestamp = STATEclk_timer_8hz_timestamp_t->value->uint32;;
-    uint32_t state_clk_timer_16hz_timestamp = STATEclk_timer_16hz_timestamp_t->value->uint32;;
-    uint32_t state_clk_timer_32hz_timestamp = STATEclk_timer_32hz_timestamp_t->value->uint32;;
-    uint32_t state_clk_timer_64hz_timestamp = STATEclk_timer_64hz_timestamp_t->value->uint32;;
-    uint32_t state_clk_timer_128hz_timestamp = STATEclk_timer_128hz_timestamp_t->value->uint32;;
-    uint32_t state_clk_timer_256hz_timestamp = STATEclk_timer_256hz_timestamp_t->value->uint32;;
+    uint32_t state_clk_timer_2hz_timestamp = STATEclk_timer_2hz_timestamp_t->value->uint32;
+    uint32_t state_clk_timer_4hz_timestamp = STATEclk_timer_4hz_timestamp_t->value->uint32;
+    uint32_t state_clk_timer_8hz_timestamp = STATEclk_timer_8hz_timestamp_t->value->uint32;
+    uint32_t state_clk_timer_16hz_timestamp = STATEclk_timer_16hz_timestamp_t->value->uint32;
+    uint32_t state_clk_timer_32hz_timestamp = STATEclk_timer_32hz_timestamp_t->value->uint32;
+    uint32_t state_clk_timer_64hz_timestamp = STATEclk_timer_64hz_timestamp_t->value->uint32;
+    uint32_t state_clk_timer_128hz_timestamp = STATEclk_timer_128hz_timestamp_t->value->uint32;
+    uint32_t state_clk_timer_256hz_timestamp = STATEclk_timer_256hz_timestamp_t->value->uint32;
     
     uint32_t state_prog_timer_timestamp = STATEprog_timer_timestamp_t->value->uint32;
     uint8_t state_prog_timer_enabled = STATEprog_timer_enabled_t->value->uint8;
@@ -571,8 +573,6 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
 
     stateToLoad.tick_counter = state_tick_counter;
     
-    //stateToLoad.clk_timer_timestamp = state_clk_timer_timestamp;
-
     stateToLoad.clk_timer_2hz_timestamp  = state_clk_timer_2hz_timestamp;
     stateToLoad.clk_timer_4hz_timestamp  = state_clk_timer_4hz_timestamp;
     stateToLoad.clk_timer_8hz_timestamp  = state_clk_timer_8hz_timestamp;
