@@ -2,11 +2,11 @@
 #define FPS 30
 #define FPS_DELAY 1000/FPS //ms
 #define STEP_DELAY 1 //ms
-#define STEPS_PER_DELAY 600//55  
 
 #define VRAM_SIZE (64 + 13)
 #define BYTES_PER_LINE 32
 #define BITS_PER_BYTE 8
+#define P1P2_ID 0xFA2
 
 //#undef PBL_COLOR // only used for testing B&W
 
@@ -51,10 +51,15 @@ static VibePattern s_vibesPattern = {
 };
 
 static bool_t s_screen_buffer[LCD_HEIGHT][LCD_WIDTH] = {{0}};
+#if defined(E0C6S48_SUPPORT)
+static u12_t g_program[8192] = {0};
+#elif defined(E0C6S46_SUPPORT)
 static u12_t g_program[6144] = {0};
+#endif
 static bool s_hasReceivedRom = false;
 static bool s_hasReceivedSaveFile = false;
 static bool s_clearTextLayerOnScreenRefresh = false;
+static bool s_tamalib_is_late = false;
 static flat_state_t stateToLoad = {0};
 
 //ticks
@@ -104,7 +109,9 @@ static timestamp_t hal_get_timestamp(void)
 
 static void hal_sleep_until(timestamp_t ts) //this makes the time be accurate
 {
-  while((int) (ts - hal_get_timestamp()) > 0);
+  if ((int) (ts - hal_get_timestamp()) > 0) {
+    s_tamalib_is_late = false;
+  }
 }
 
 static void hal_update_screen(void) //since we're not using tamalib_mainloop we must call this ourselves
@@ -114,6 +121,7 @@ static void hal_update_screen(void) //since we're not using tamalib_mainloop we 
 
 static void hal_set_lcd_matrix(u8_t x, u8_t y, bool_t val)
 {
+  //APP_LOG(APP_LOG_LEVEL_DEBUG, "setting lcd screen"); 
   s_screen_buffer[y][x] = val;
   s_pixelsChanged = true;
 }
@@ -192,7 +200,9 @@ static hal_t hal = {
 /*   END HAL T FUNCTIONS   */
 /***************************/
 
-void set_screen_to_last_state(uint8_t *fullRam) { // gets screen data from memory and sets it to the screen
+// TODO: Seems to only work when E0C6S48_SUPPORT is not defined. Use segment information to restore properly?
+// Will likely not work with digimon as well
+void set_screen_to_last_state(uint8_t *fullRam) { // gets screen data from memory and sets it to the screen 
     uint8_t vram[VRAM_SIZE];
 
     memcpy(vram, fullRam + 320, VRAM_SIZE);
@@ -248,10 +258,10 @@ static void milli_tick() //runs once every ms.
 {
   if (s_hasReceivedRom && s_hasReceivedSaveFile)
   {
-    for (size_t i = 0; i < STEPS_PER_DELAY; i++)
-    {
-        tamalib_step();
-    } 
+    s_tamalib_is_late = true;
+    while (s_tamalib_is_late) {
+      tamalib_step();
+    }
   } 
   milli_tick_handler = app_timer_register(STEP_DELAY, milli_tick, NULL); // calls itself in 1ms
 }
@@ -421,18 +431,6 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
     Message("Loading ROM 0%");
   }
 
-  Tuple *reset_tamagotchi_t = dict_find(iter, MESSAGE_KEY_reset_tamagotchi);
-  if (reset_tamagotchi_t)
-  {
-    if (s_hasReceivedRom)
-    {
-      s_clearTextLayerOnScreenRefresh = true;
-      s_hasReceivedSaveFile = false;
-      initTamalib();
-    }
-  }
-  
-
   // handle incoming rom
   Tuple *offset_t = dict_find(iter, MESSAGE_KEY_ROMOffset);
   Tuple *chunk_t = dict_find(iter, MESSAGE_KEY_ROMChunk);
@@ -442,29 +440,43 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
     int offset = offset_t->value->int16;
     uint8_t *chunk = chunk_t->value->data;
     int index = 0;
+    bool_t isP1P2 = false;
 
     // Convert bytes → u12_t values
     for (int i = 0; i < chunk_t->length; i += 2) {
         index = (offset + i) / 2;
 
-        if (index >= 6144) break; // safety
+        if (index >= 8192) break; // safety
 
         u12_t value = chunk[i] | (chunk[i + 1] << 8);
 
         g_program[index] = value & 0x0FFF; // ensure 12-bit
+        isP1P2 = g_program[0] == P1P2_ID;
 
         static char progress_text[25];
-        int percentage = (offset * 100)/12288;
+        
+        int percentage = (offset * 100)/(isP1P2?12288:16384);
         snprintf(progress_text, sizeof(progress_text), "Loading ROM %d%%", percentage);
         Message(progress_text);
     }
-    if (index == 6143)
+    if ((isP1P2 && index == 6143) || index == 8191) // if detects P1/P2 stop at 6143, else stop at 8191)
     {
       // we reached the end and can safely start now
       Message("Loading ROM 100%");
-      APP_LOG(APP_LOG_LEVEL_DEBUG, "Reached end of ROM!");
+      APP_LOG(APP_LOG_LEVEL_DEBUG, "Reached end of ROM! %d", index);
       s_hasReceivedRom = true;
       // wait for save file from js
+    }
+  }
+
+  Tuple *reset_tamagotchi_t = dict_find(iter, MESSAGE_KEY_reset_tamagotchi);
+  if (reset_tamagotchi_t)
+  {
+    if (s_hasReceivedRom)
+    {
+      s_clearTextLayerOnScreenRefresh = true;
+      s_hasReceivedSaveFile = false;
+      initTamalib();
     }
   }
 
@@ -495,7 +507,14 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
   Tuple *STATEflags_t = dict_find(iter, MESSAGE_KEY_STATEflags);
 
   Tuple *STATEtick_counter_t = dict_find(iter, MESSAGE_KEY_STATEtick_counter);
-  Tuple *STATEclk_timer_timestamp_t = dict_find(iter, MESSAGE_KEY_STATEclk_timer_timestamp);
+  Tuple *STATEclk_timer_2hz_timestamp_t = dict_find(iter, MESSAGE_KEY_STATEclk_timer_2hz_timestamp);
+  Tuple *STATEclk_timer_4hz_timestamp_t = dict_find(iter, MESSAGE_KEY_STATEclk_timer_4hz_timestamp);
+  Tuple *STATEclk_timer_8hz_timestamp_t = dict_find(iter, MESSAGE_KEY_STATEclk_timer_8hz_timestamp);
+  Tuple *STATEclk_timer_16hz_timestamp_t = dict_find(iter, MESSAGE_KEY_STATEclk_timer_16hz_timestamp);
+  Tuple *STATEclk_timer_32hz_timestamp_t = dict_find(iter, MESSAGE_KEY_STATEclk_timer_32hz_timestamp);
+  Tuple *STATEclk_timer_64hz_timestamp_t = dict_find(iter, MESSAGE_KEY_STATEclk_timer_64hz_timestamp);
+  Tuple *STATEclk_timer_128hz_timestamp_t = dict_find(iter, MESSAGE_KEY_STATEclk_timer_128hz_timestamp);
+  Tuple *STATEclk_timer_256hz_timestamp_t = dict_find(iter, MESSAGE_KEY_STATEclk_timer_256hz_timestamp);
   Tuple *STATEprog_timer_timestamp_t = dict_find(iter, MESSAGE_KEY_STATEprog_timer_timestamp);
   Tuple *STATEprog_timer_enabled_t = dict_find(iter, MESSAGE_KEY_STATEprog_timer_enabled);
   Tuple *STATEprog_timer_data_t = dict_find(iter, MESSAGE_KEY_STATEprog_timer_data);
@@ -528,7 +547,16 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
     uint8_t state_flags = STATEflags_t->value->uint8;
 
     uint32_t state_tick_counter = STATEtick_counter_t->value->uint32;
-    uint32_t state_clk_timer_timestamp = STATEclk_timer_timestamp_t->value->uint32;
+
+    uint32_t state_clk_timer_2hz_timestamp = STATEclk_timer_2hz_timestamp_t->value->uint32;
+    uint32_t state_clk_timer_4hz_timestamp = STATEclk_timer_4hz_timestamp_t->value->uint32;
+    uint32_t state_clk_timer_8hz_timestamp = STATEclk_timer_8hz_timestamp_t->value->uint32;
+    uint32_t state_clk_timer_16hz_timestamp = STATEclk_timer_16hz_timestamp_t->value->uint32;
+    uint32_t state_clk_timer_32hz_timestamp = STATEclk_timer_32hz_timestamp_t->value->uint32;
+    uint32_t state_clk_timer_64hz_timestamp = STATEclk_timer_64hz_timestamp_t->value->uint32;
+    uint32_t state_clk_timer_128hz_timestamp = STATEclk_timer_128hz_timestamp_t->value->uint32;
+    uint32_t state_clk_timer_256hz_timestamp = STATEclk_timer_256hz_timestamp_t->value->uint32;
+    
     uint32_t state_prog_timer_timestamp = STATEprog_timer_timestamp_t->value->uint32;
     uint8_t state_prog_timer_enabled = STATEprog_timer_enabled_t->value->uint8;
     uint8_t state_prog_timer_data = STATEprog_timer_data_t->value->uint8;
@@ -548,7 +576,16 @@ static void prv_inbox_received_handler(DictionaryIterator *iter, void *context) 
     stateToLoad.flags = state_flags;
 
     stateToLoad.tick_counter = state_tick_counter;
-    stateToLoad.clk_timer_timestamp = state_clk_timer_timestamp;
+    
+    stateToLoad.clk_timer_2hz_timestamp  = state_clk_timer_2hz_timestamp;
+    stateToLoad.clk_timer_4hz_timestamp  = state_clk_timer_4hz_timestamp;
+    stateToLoad.clk_timer_8hz_timestamp  = state_clk_timer_8hz_timestamp;
+    stateToLoad.clk_timer_16hz_timestamp = state_clk_timer_16hz_timestamp; 
+    stateToLoad.clk_timer_32hz_timestamp = state_clk_timer_32hz_timestamp; 
+    stateToLoad.clk_timer_64hz_timestamp = state_clk_timer_64hz_timestamp;
+    stateToLoad.clk_timer_128hz_timestamp = state_clk_timer_128hz_timestamp;
+    stateToLoad.clk_timer_256hz_timestamp = state_clk_timer_256hz_timestamp;
+
     stateToLoad.prog_timer_timestamp = state_prog_timer_timestamp;
     stateToLoad.prog_timer_enabled = state_prog_timer_enabled;
     stateToLoad.prog_timer_data = state_prog_timer_data;
@@ -797,7 +834,15 @@ static void saveCurrentStateAndQuit()
     dict_write_int(out_iter, MESSAGE_KEY_STATEflags, &saveState.flags, sizeof(uint8_t), false);
     
     dict_write_int(out_iter, MESSAGE_KEY_STATEtick_counter, &saveState.tick_counter, sizeof(uint32_t), false);
-    dict_write_int(out_iter, MESSAGE_KEY_STATEclk_timer_timestamp, &saveState.clk_timer_timestamp, sizeof(uint32_t), false);
+    dict_write_int(out_iter, MESSAGE_KEY_STATEclk_timer_2hz_timestamp, &saveState.clk_timer_2hz_timestamp, sizeof(uint32_t), false);
+    dict_write_int(out_iter, MESSAGE_KEY_STATEclk_timer_4hz_timestamp, &saveState.clk_timer_4hz_timestamp, sizeof(uint32_t), false);
+    dict_write_int(out_iter, MESSAGE_KEY_STATEclk_timer_8hz_timestamp, &saveState.clk_timer_8hz_timestamp, sizeof(uint32_t), false);
+    dict_write_int(out_iter, MESSAGE_KEY_STATEclk_timer_16hz_timestamp, &saveState.clk_timer_16hz_timestamp, sizeof(uint32_t), false);
+    dict_write_int(out_iter, MESSAGE_KEY_STATEclk_timer_32hz_timestamp, &saveState.clk_timer_32hz_timestamp, sizeof(uint32_t), false);
+    dict_write_int(out_iter, MESSAGE_KEY_STATEclk_timer_64hz_timestamp, &saveState.clk_timer_64hz_timestamp, sizeof(uint32_t), false);
+    dict_write_int(out_iter, MESSAGE_KEY_STATEclk_timer_128hz_timestamp, &saveState.clk_timer_128hz_timestamp, sizeof(uint32_t), false);
+    dict_write_int(out_iter, MESSAGE_KEY_STATEclk_timer_256hz_timestamp, &saveState.clk_timer_256hz_timestamp, sizeof(uint32_t), false);
+
     dict_write_int(out_iter, MESSAGE_KEY_STATEprog_timer_timestamp, &saveState.prog_timer_timestamp, sizeof(uint32_t), false);
     dict_write_int(out_iter, MESSAGE_KEY_STATEprog_timer_enabled, &saveState.prog_timer_enabled, sizeof(uint8_t), false);
     dict_write_int(out_iter, MESSAGE_KEY_STATEprog_timer_data, &saveState.prog_timer_data, sizeof(uint8_t), false);

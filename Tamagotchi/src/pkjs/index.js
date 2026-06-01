@@ -7,6 +7,10 @@ const APIKEY_KEY = "APIKEY";
 const ROMURL_KEY = "ROMURL";
 const SERVER_SAVE_FAILED_KEY = "SERVER_SAVE_FAILED";
 
+const CURRENT_VERSION = "1.3";
+const LAST_VERSION_NOTIFIED_KEY = "LAST_VERSION_NOTIFIED";
+const RELEASE_NOTE_TITLE = "Tamagotchi V1.3.0 Release Notes";
+const RELEASE_NOTE_BODY = "ATTENTION: Bug fixes + TamaLIB update. Old save states may no longer work and a reset is likely needed :( Update your Tamagotchi API Server manually if used."
 
 // Import the Clay package
 var Clay = require('@rebble/clay');
@@ -89,7 +93,7 @@ function FetchROM()
 
         let stringArray = ROMText.split(", ");
         let values = stringArray.map(s => parseInt(s, 16)); // convert to integers
-        if (values.length !== 6144) // exact length of P1 rom
+        if (values.length !== 6144/* && values.length !== 8192*/) // 6144 exact length of a E0C6S46 (P1/P2) ROM; 8192 exact length of a E0C6S48 ROM (Angel, Digimon, Mothra...)
         {
             console.log("Incorrect ROM!");
             Pebble.sendAppMessage({'JSMessage': "Incorrect ROM!"});
@@ -113,7 +117,7 @@ function SendROM(buffer) {
     console.log("Trying to send ROM...");
 
     // send chunked to watch
-    const CHUNK_SIZE = 2048; //TODO test
+    const CHUNK_SIZE = 2048; 
     let offset = 0;
     sendNextChunk(buffer);
 
@@ -188,7 +192,14 @@ function SendSaveStateToWatch() // Send last save state back to watch
                 'STATEsp': serverState.sp,
                 'STATEflags': serverState.flags,
                 'STATEtick_counter': serverState.tick_counter,
-                'STATEclk_timer_timestamp': serverState.clk_timer_timestamp,
+                'STATEclk_timer_2hz_timestamp': serverState.clk_timer_2hz_timestamp,
+                'STATEclk_timer_4hz_timestamp': serverState.clk_timer_4hz_timestamp,
+                'STATEclk_timer_8hz_timestamp': serverState.clk_timer_8hz_timestamp,
+                'STATEclk_timer_16hz_timestamp': serverState.clk_timer_16hz_timestamp,
+                'STATEclk_timer_32hz_timestamp': serverState.clk_timer_32hz_timestamp,
+                'STATEclk_timer_64hz_timestamp': serverState.clk_timer_64hz_timestamp,
+                'STATEclk_timer_128hz_timestamp': serverState.clk_timer_128hz_timestamp,
+                'STATEclk_timer_256hz_timestamp': serverState.clk_timer_256hz_timestamp,
                 'STATEprog_timer_timestamp': serverState.prog_timer_timestamp,
                 'STATEprog_timer_enabled': serverState.prog_timer_enabled,
                 'STATEprog_timer_data': serverState.prog_timer_data,
@@ -256,6 +267,16 @@ Pebble.addEventListener('ready',
 
         // Update s_js_ready on watch
         Pebble.sendAppMessage({'JSReady': 1});
+
+        let lastVersionNotified = localStorage.getItem(LAST_VERSION_NOTIFIED_KEY);
+        if (lastVersionNotified === null || lastVersionNotified !== CURRENT_VERSION)
+        {
+            Pebble.showSimpleNotificationOnPebble(
+                RELEASE_NOTE_TITLE,
+                RELEASE_NOTE_BODY
+            );
+            localStorage.setItem(LAST_VERSION_NOTIFIED_KEY, CURRENT_VERSION);
+        }
 
         FetchROM();
     }   
@@ -332,7 +353,14 @@ function SaveStateAfterClosingApp(saveStateDict)
             'sp': saveStateDict.STATEsp,
             'flags': saveStateDict.STATEflags,
             'tick_counter': saveStateDict.STATEtick_counter,
-            'clk_timer_timestamp': saveStateDict.STATEclk_timer_timestamp,
+            'clk_timer_2hz_timestamp': saveStateDict.STATEclk_timer_2hz_timestamp,
+            'clk_timer_4hz_timestamp': saveStateDict.STATEclk_timer_4hz_timestamp,
+            'clk_timer_8hz_timestamp': saveStateDict.STATEclk_timer_8hz_timestamp,
+            'clk_timer_16hz_timestamp': saveStateDict.STATEclk_timer_16hz_timestamp,
+            'clk_timer_32hz_timestamp': saveStateDict.STATEclk_timer_32hz_timestamp,
+            'clk_timer_64hz_timestamp': saveStateDict.STATEclk_timer_64hz_timestamp,
+            'clk_timer_128hz_timestamp': saveStateDict.STATEclk_timer_128hz_timestamp,
+            'clk_timer_256hz_timestamp': saveStateDict.STATEclk_timer_256hz_timestamp,
             'prog_timer_timestamp': saveStateDict.STATEprog_timer_timestamp,
             'prog_timer_enabled': saveStateDict.STATEprog_timer_enabled,
             'prog_timer_data': saveStateDict.STATEprog_timer_data,
